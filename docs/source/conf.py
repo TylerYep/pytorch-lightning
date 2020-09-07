@@ -244,184 +244,184 @@ epub_title = project
 #
 # epub_identifier = ''
 
-# A unique identification for the text.
-#
-# epub_uid = ''
+# # A unique identification for the text.
+# #
+# # epub_uid = ''
 
-# A list of files that should not be packed into the epub file.
-epub_exclude_files = ['search.html']
+# # A list of files that should not be packed into the epub file.
+# epub_exclude_files = ['search.html']
 
-# -- Extension configuration -------------------------------------------------
+# # -- Extension configuration -------------------------------------------------
 
-# -- Options for intersphinx extension ---------------------------------------
+# # -- Options for intersphinx extension ---------------------------------------
 
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'torch': ('https://pytorch.org/docs/stable/', None),
-    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
-    'PIL': ('https://pillow.readthedocs.io/en/stable/', None),
-}
+# intersphinx_mapping = {
+#     'python': ('https://docs.python.org/3', None),
+#     'torch': ('https://pytorch.org/docs/stable/', None),
+#     'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+#     'PIL': ('https://pillow.readthedocs.io/en/stable/', None),
+# }
 
-# -- Options for todo extension ----------------------------------------------
+# # -- Options for todo extension ----------------------------------------------
 
-# If true, `todo` and `todoList` produce output, else they produce nothing.
-todo_include_todos = True
-
-
-# packages for which sphinx-apidoc should generate the docs (.rst files)
-PACKAGES = [
-    pytorch_lightning.__name__,
-    'pl_examples',
-]
-
-apidoc_output_folder = os.path.join(PATH_HERE, 'api')
+# # If true, `todo` and `todoList` produce output, else they produce nothing.
+# todo_include_todos = True
 
 
-def run_apidoc(_):
-    sys.path.insert(0, apidoc_output_folder)
+# # packages for which sphinx-apidoc should generate the docs (.rst files)
+# PACKAGES = [
+#     pytorch_lightning.__name__,
+#     'pl_examples',
+# ]
 
-    # delete api-doc files before generating them
-    if os.path.exists(apidoc_output_folder):
-        shutil.rmtree(apidoc_output_folder)
-
-    for pkg in PACKAGES:
-        argv = ['-e',
-                '-o', apidoc_output_folder,
-                os.path.join(PATH_ROOT, pkg),
-                '**/test_*',
-                '--force',
-                '--private',
-                '--module-first']
-
-        apidoc.main(argv)
+# apidoc_output_folder = os.path.join(PATH_HERE, 'api')
 
 
-def setup(app):
-    # this is for hiding doctest decoration,
-    # see: http://z4r.github.io/python/2011/12/02/hides-the-prompts-and-output/
-    app.add_javascript('copybutton.js')
-    app.connect('builder-inited', run_apidoc)
+# def run_apidoc(_):
+#     sys.path.insert(0, apidoc_output_folder)
+
+#     # delete api-doc files before generating them
+#     if os.path.exists(apidoc_output_folder):
+#         shutil.rmtree(apidoc_output_folder)
+
+#     for pkg in PACKAGES:
+#         argv = ['-e',
+#                 '-o', apidoc_output_folder,
+#                 os.path.join(PATH_ROOT, pkg),
+#                 '**/test_*',
+#                 '--force',
+#                 '--private',
+#                 '--module-first']
+
+#         apidoc.main(argv)
 
 
-# copy all notebooks to local folder
-path_nbs = os.path.join(PATH_HERE, 'notebooks')
-if not os.path.isdir(path_nbs):
-    os.mkdir(path_nbs)
-for path_ipynb in glob.glob(os.path.join(PATH_ROOT, 'notebooks', '*.ipynb')):
-    path_ipynb2 = os.path.join(path_nbs, os.path.basename(path_ipynb))
-    shutil.copy(path_ipynb, path_ipynb2)
+# def setup(app):
+#     # this is for hiding doctest decoration,
+#     # see: http://z4r.github.io/python/2011/12/02/hides-the-prompts-and-output/
+#     app.add_javascript('copybutton.js')
+#     app.connect('builder-inited', run_apidoc)
 
 
-# Ignoring Third-party packages
-# https://stackoverflow.com/questions/15889621/sphinx-how-to-exclude-imports-in-automodule
-def package_list_from_file(file):
-    mocked_packages = []
-    with open(file, 'r') as fp:
-        for ln in fp.readlines():
-            found = [ln.index(ch) for ch in list(',=<>#') if ch in ln]
-            pkg = ln[:min(found)] if found else ln
-            if pkg.rstrip():
-                mocked_packages.append(pkg.rstrip())
-    return mocked_packages
+# # copy all notebooks to local folder
+# path_nbs = os.path.join(PATH_HERE, 'notebooks')
+# if not os.path.isdir(path_nbs):
+#     os.mkdir(path_nbs)
+# for path_ipynb in glob.glob(os.path.join(PATH_ROOT, 'notebooks', '*.ipynb')):
+#     path_ipynb2 = os.path.join(path_nbs, os.path.basename(path_ipynb))
+#     shutil.copy(path_ipynb, path_ipynb2)
 
 
-MOCK_PACKAGES = []
-if SPHINX_MOCK_REQUIREMENTS:
-    # mock also base packages when we are on RTD since we don't install them there
-    MOCK_PACKAGES += package_list_from_file(os.path.join(PATH_ROOT, 'requirements/base.txt'))
-    MOCK_PACKAGES += package_list_from_file(os.path.join(PATH_ROOT, 'requirements/extra.txt'))
-
-MOCK_MANUAL_PACKAGES = [
-    'torchvision',
-    'PIL',
-    # packages with different package name compare to import name
-    'yaml',
-    'comet_ml',
-    'neptune',
-]
-autodoc_mock_imports = MOCK_PACKAGES + MOCK_MANUAL_PACKAGES
+# # Ignoring Third-party packages
+# # https://stackoverflow.com/questions/15889621/sphinx-how-to-exclude-imports-in-automodule
+# def package_list_from_file(file):
+#     mocked_packages = []
+#     with open(file, 'r') as fp:
+#         for ln in fp.readlines():
+#             found = [ln.index(ch) for ch in list(',=<>#') if ch in ln]
+#             pkg = ln[:min(found)] if found else ln
+#             if pkg.rstrip():
+#                 mocked_packages.append(pkg.rstrip())
+#     return mocked_packages
 
 
-# Resolve function
-# This function is used to populate the (source) links in the API
-def linkcode_resolve(domain, info):
-    def find_source():
-        # try to find the file and line number, based on code from numpy:
-        # https://github.com/numpy/numpy/blob/master/doc/source/conf.py#L286
-        obj = sys.modules[info['module']]
-        for part in info['fullname'].split('.'):
-            obj = getattr(obj, part)
-        fname = inspect.getsourcefile(obj)
-        # https://github.com/rtfd/readthedocs.org/issues/5735
-        if any([s in fname for s in ('readthedocs', 'rtfd', 'checkouts')]):
-            # /home/docs/checkouts/readthedocs.org/user_builds/pytorch_lightning/checkouts/
-            #  devel/pytorch_lightning/utilities/cls_experiment.py#L26-L176
-            path_top = os.path.abspath(os.path.join('..', '..', '..'))
-            fname = os.path.relpath(fname, start=path_top)
-        else:
-            # Local build, imitate master
-            fname = 'master/' + os.path.relpath(fname, start=os.path.abspath('..'))
-        source, lineno = inspect.getsourcelines(obj)
-        return fname, lineno, lineno + len(source) - 1
+# MOCK_PACKAGES = []
+# if SPHINX_MOCK_REQUIREMENTS:
+#     # mock also base packages when we are on RTD since we don't install them there
+#     MOCK_PACKAGES += package_list_from_file(os.path.join(PATH_ROOT, 'requirements/base.txt'))
+#     MOCK_PACKAGES += package_list_from_file(os.path.join(PATH_ROOT, 'requirements/extra.txt'))
 
-    if domain != 'py' or not info['module']:
-        return None
-    try:
-        filename = '%s#L%d-L%d' % find_source()
-    except Exception:
-        filename = info['module'].replace('.', '/') + '.py'
-    # import subprocess
-    # tag = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE,
-    #                        universal_newlines=True).communicate()[0][:-1]
-    branch = filename.split('/')[0]
-    # do mapping from latest tags to master
-    branch = {'latest': 'master', 'stable': 'master'}.get(branch, branch)
-    filename = '/'.join([branch] + filename.split('/')[1:])
-    return "https://github.com/%s/%s/blob/%s" \
-           % (github_user, github_repo, filename)
+# MOCK_MANUAL_PACKAGES = [
+#     'torchvision',
+#     'PIL',
+#     # packages with different package name compare to import name
+#     'yaml',
+#     'comet_ml',
+#     'neptune',
+# ]
+# autodoc_mock_imports = MOCK_PACKAGES + MOCK_MANUAL_PACKAGES
 
 
-autodoc_member_order = 'groupwise'
-autoclass_content = 'both'
-# the options are fixed and will be soon in release,
-#  see https://github.com/sphinx-doc/sphinx/issues/5459
-autodoc_default_options = {
-    'members': None,
-    'methods': None,
-    # 'attributes': None,
-    'special-members': '__call__',
-    'exclude-members': '_abc_impl',
-    'show-inheritance': True,
-    'private-members': True,
-    'noindex': True,
-}
+# # Resolve function
+# # This function is used to populate the (source) links in the API
+# def linkcode_resolve(domain, info):
+#     def find_source():
+#         # try to find the file and line number, based on code from numpy:
+#         # https://github.com/numpy/numpy/blob/master/doc/source/conf.py#L286
+#         obj = sys.modules[info['module']]
+#         for part in info['fullname'].split('.'):
+#             obj = getattr(obj, part)
+#         fname = inspect.getsourcefile(obj)
+#         # https://github.com/rtfd/readthedocs.org/issues/5735
+#         if any([s in fname for s in ('readthedocs', 'rtfd', 'checkouts')]):
+#             # /home/docs/checkouts/readthedocs.org/user_builds/pytorch_lightning/checkouts/
+#             #  devel/pytorch_lightning/utilities/cls_experiment.py#L26-L176
+#             path_top = os.path.abspath(os.path.join('..', '..', '..'))
+#             fname = os.path.relpath(fname, start=path_top)
+#         else:
+#             # Local build, imitate master
+#             fname = 'master/' + os.path.relpath(fname, start=os.path.abspath('..'))
+#         source, lineno = inspect.getsourcelines(obj)
+#         return fname, lineno, lineno + len(source) - 1
 
-# Sphinx will add “permalinks” for each heading and description environment as paragraph signs that
-#  become visible when the mouse hovers over them.
-# This value determines the text for the permalink; it defaults to "¶". Set it to None or the empty
-#  string to disable permalinks.
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-html_add_permalinks
-html_add_permalinks = "¶"
-
-# True to prefix each section label with the name of the document it is in, followed by a colon.
-#  For example, index:Introduction for a section called Introduction that appears in document index.rst.
-#  Useful for avoiding ambiguity when the same section heading appears in different documents.
-# http://www.sphinx-doc.org/en/master/usage/extensions/autosectionlabel.html
-autosectionlabel_prefix_document = True
-
-# only run doctests marked with a ".. doctest::" directive
-doctest_test_doctest_blocks = ''
-doctest_global_setup = """
-
-import importlib
-import os
-import torch
-
-from pytorch_lightning.utilities import NATIVE_AMP_AVALAIBLE
-APEX_AVAILABLE = importlib.util.find_spec("apex") is not None
-XLA_AVAILABLE = importlib.util.find_spec("torch_xla") is not None
-TORCHVISION_AVAILABLE = importlib.util.find_spec("torchvision") is not None
+#     if domain != 'py' or not info['module']:
+#         return None
+#     try:
+#         filename = '%s#L%d-L%d' % find_source()
+#     except Exception:
+#         filename = info['module'].replace('.', '/') + '.py'
+#     # import subprocess
+#     # tag = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE,
+#     #                        universal_newlines=True).communicate()[0][:-1]
+#     branch = filename.split('/')[0]
+#     # do mapping from latest tags to master
+#     branch = {'latest': 'master', 'stable': 'master'}.get(branch, branch)
+#     filename = '/'.join([branch] + filename.split('/')[1:])
+#     return "https://github.com/%s/%s/blob/%s" \
+#            % (github_user, github_repo, filename)
 
 
-"""
-coverage_skip_undoc_in_source = True
+# autodoc_member_order = 'groupwise'
+# autoclass_content = 'both'
+# # the options are fixed and will be soon in release,
+# #  see https://github.com/sphinx-doc/sphinx/issues/5459
+# autodoc_default_options = {
+#     'members': None,
+#     'methods': None,
+#     # 'attributes': None,
+#     'special-members': '__call__',
+#     'exclude-members': '_abc_impl',
+#     'show-inheritance': True,
+#     'private-members': True,
+#     'noindex': True,
+# }
+
+# # Sphinx will add “permalinks” for each heading and description environment as paragraph signs that
+# #  become visible when the mouse hovers over them.
+# # This value determines the text for the permalink; it defaults to "¶". Set it to None or the empty
+# #  string to disable permalinks.
+# # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-html_add_permalinks
+# html_add_permalinks = "¶"
+
+# # True to prefix each section label with the name of the document it is in, followed by a colon.
+# #  For example, index:Introduction for a section called Introduction that appears in document index.rst.
+# #  Useful for avoiding ambiguity when the same section heading appears in different documents.
+# # http://www.sphinx-doc.org/en/master/usage/extensions/autosectionlabel.html
+# autosectionlabel_prefix_document = True
+
+# # only run doctests marked with a ".. doctest::" directive
+# doctest_test_doctest_blocks = ''
+# doctest_global_setup = """
+
+# import importlib
+# import os
+# import torch
+
+# from pytorch_lightning.utilities import NATIVE_AMP_AVALAIBLE
+# APEX_AVAILABLE = importlib.util.find_spec("apex") is not None
+# XLA_AVAILABLE = importlib.util.find_spec("torch_xla") is not None
+# TORCHVISION_AVAILABLE = importlib.util.find_spec("torchvision") is not None
+
+
+# """
+# coverage_skip_undoc_in_source = True

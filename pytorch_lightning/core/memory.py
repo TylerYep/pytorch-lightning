@@ -16,7 +16,7 @@ import os
 import shutil
 import subprocess
 from collections import OrderedDict
-from typing import Tuple, Dict, Union, List, Any
+from typing import Tuple, Dict, Union, List, Any, Optional
 
 import numpy as np
 import torch
@@ -24,12 +24,18 @@ import torch.nn as nn
 from torch.utils.hooks import RemovableHandle
 
 from pytorch_lightning.utilities import AMPType
+from .lightningsummary.model_statistics import ModelStatistics
+from .lightningsummary.formatting import FormattingOptions, Verbosity
+from .lightningsummary.layer_info import LayerInfo
+
+from pytorch_lightning.utilities import NATIVE_AMP_AVALAIBLE
+from pytorch_lightning.utilities.apply_func import apply_to_collection
 
 PARAMETER_NUM_UNITS = [" ", "K", "M", "B", "T"]
 UNKNOWN_SIZE = "?"
 
 
-class LayerSummary(object):
+class LayerSummary:
     """
     Summary class for a single layer in a :class:`~pytorch_lightning.core.lightning.LightningModule`.
     It collects the following information:
@@ -117,7 +123,60 @@ class LayerSummary(object):
         return sum(np.prod(p.shape) for p in self._module.parameters())
 
 
-class ModelSummary(object):
+def apply_hooks(
+    module: nn.Module,
+    orig_model: nn.Module,
+    depth: int,
+    summary_list: List[LayerInfo],
+    hooks: List[RemovableHandle],
+    idx: Dict[int, int],
+    batch_dim: int,
+    curr_depth: int = 0,
+    parent_info: Optional[LayerInfo] = None,
+) -> None:
+    """ Recursively adds hooks to all layers of the model. """
+    fallback_info = LayerInfo(module, curr_depth, None, parent_info)
+    info = fallback_info
+
+    def pre_hook(module: nn.Module, inputs: Any) -> None:
+        """ Create a LayerInfo object to aggregate information about that layer. """
+        del inputs
+        nonlocal info
+        idx[curr_depth] = idx.get(curr_depth, 0) + 1
+        info = LayerInfo(module, curr_depth, idx[curr_depth], parent_info)
+        info.depth_index = idx[curr_depth]
+        info.check_recursive(summary_list)
+        summary_list.append(info)
+
+    def hook(module: nn.Module, inputs: Any, outputs: Any) -> None:
+        """ Update LayerInfo after forward pass. """
+        del module
+        info.input_size = info.calculate_size(inputs, batch_dim)
+        info.output_size = info.calculate_size(outputs, batch_dim)
+        info.calculate_num_params()
+        info.executed = True
+
+    submodules = [m for m in module.modules() if m is not orig_model]
+    if module != orig_model or not submodules:  # or isinstance(module, LAYER_MODULES)
+        hooks.append(module.register_forward_pre_hook(pre_hook))
+        hooks.append(module.register_forward_hook(hook))
+
+    if curr_depth <= depth:
+        for child in module.children():
+            apply_hooks(
+                child,
+                orig_model,
+                depth,
+                summary_list,
+                hooks,
+                idx,
+                batch_dim,
+                curr_depth + 1,
+                fallback_info,
+            )
+
+
+class ModelSummary:
     """
     Generates a summary of all layers in a :class:`~pytorch_lightning.core.lightning.LightningModule`.
 
@@ -171,55 +230,63 @@ class ModelSummary(object):
     def __init__(self, model, mode: str = MODE_DEFAULT):
         self._model = model
         self._mode = mode
-        self._layer_summary = self.summarize()
+        self.summary_list = self.summarize()
 
     @property
     def named_modules(self) -> List[Tuple[str, nn.Module]]:
+        mods = []
         if self._mode == ModelSummary.MODE_FULL:
             mods = self._model.named_modules()
             mods = list(mods)[1:]  # do not include root module (LightningModule)
         elif self._mode == ModelSummary.MODE_TOP:
             # the children are the top-level modules
             mods = self._model.named_children()
-        else:
-            mods = []
         return list(mods)
 
     @property
     def layer_names(self) -> List[str]:
-        return list(self._layer_summary.keys())
+        return [layer.class_name for layer in self.summary_list]
 
     @property
     def layer_types(self) -> List[str]:
-        return [layer.layer_type for layer in self._layer_summary.values()]
+        return [layer.class_name for layer in self.summary_list]
 
     @property
     def in_sizes(self) -> List:
-        return [layer.in_size for layer in self._layer_summary.values()]
+        return [layer.input_size for layer in self.summary_list]
 
     @property
     def out_sizes(self) -> List:
-        return [layer.out_size for layer in self._layer_summary.values()]
+        return [layer.output_size for layer in self.summary_list]
 
     @property
     def param_nums(self) -> List[int]:
-        return [layer.num_parameters for layer in self._layer_summary.values()]
+        return [layer.num_params for layer in self.summary_list]
 
     def summarize(self) -> Dict[str, LayerSummary]:
-        summary = OrderedDict((name, LayerSummary(module)) for name, module in self.named_modules)
+        # summary = OrderedDict((name, LayerSummary(module)) for name, module in self.named_modules)
+        summary_list = []  # type: List[LayerInfo]
+        hooks = []  # type: List[RemovableHandle]
+        idx = {}  # type: Dict[int, int]
+        apply_hooks(self._model, self._model, 3, summary_list, hooks, idx, 0)
+
         if self._model.example_input_array is not None:
             self._forward_example_input()
-        for layer in summary.values():
-            layer.detach_hook()
-        return summary
+            formatting = FormattingOptions(True, 3, 1, ("output_size", "num_params"), 25)
+            formatting.set_layer_name_width(summary_list)
+            results = ModelStatistics(summary_list, self._model.example_input_array, formatting)
+        # for layer in summary.values():
+        #     layer.detach_hook()
+        return summary_list
 
     def _forward_example_input(self) -> None:
         """ Run the example input through each layer to get input- and output sizes. """
         model = self._model
         trainer = self._model.trainer
 
-        input_ = model.example_input_array
-        input_ = model.transfer_batch_to_device(input_, model.device)
+        input_ = model.transfer_batch_to_device(
+            model.example_input_array, model.device
+        )
 
         if trainer is not None and trainer.amp_backend == AMPType.NATIVE and not trainer.use_tpu:
             model.forward = torch.cuda.amp.autocast()(model.forward)
@@ -243,7 +310,7 @@ class ModelSummary(object):
         Layer Name, Layer Type, Number of Parameters, Input Sizes, Output Sizes
         """
         arrays = [
-            [" ", list(map(str, range(len(self._layer_summary))))],
+            [" ", list(map(str, range(len(self.summary_list))))],
             ["Name", self.layer_names],
             ["Type", self.layer_types],
             ["Params", list(map(get_human_readable_count, self.param_nums))],
